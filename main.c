@@ -90,54 +90,13 @@ void set_pin_as_af() {
 
 
 
-unsigned char data_arr[255] = "ABCD";
+unsigned char data_arr[255];
 uint32_t i = 0;
 unsigned char gs_send_data = 0x55;
 
-/* Setup DMA */
-void setup_dma() {
+
+void set_memsize_persize() {
 	unsigned int value = 0;
-
-	/* Write the USART_DR address in the DMA control register as DESTINATION */
-
-	/* disable stream7 */
-	value = READ_REGISTER(DMA2_S7CR, ~1);
-	WRITE_REGISTER(DMA2_S7CR, value);
-
-	/* channel selected is 4 */
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<25));
-	WRITE_REGISTER(DMA2_S7CR, value);
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<26));
-	WRITE_REGISTER(DMA2_S7CR, value);
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<27));
-	value |= 1<<27;
-	WRITE_REGISTER(DMA2_S7CR, value);
-
-	/* set transfer mode is memory to peripheral: 01 */
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<6));
-	value |= 1<<6;
-	WRITE_REGISTER(DMA2_S7CR, value);
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<7));
-	WRITE_REGISTER(DMA2_S7CR, value);
-
-	/* setup variable as source */
-	WRITE_REGISTER(DMA2_S7M0AR, &gs_send_data);
-
-	/* setup DR as destination */
-	WRITE_REGISTER(DMA2_S7PAR, UART_DR);
-
-
-	/* setup bytes size */
-	unsigned int len_str = 4; /* number bytes want to load into source */
-	WRITE_REGISTER(DMA2_S7NDTR, len_str);
-
-	/* Configure Priority level to high(10) */
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<16));
-	WRITE_REGISTER(DMA2_S7CR, value); /* clear bit 16 */
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<17));
-	value |= 1<<17;
-	WRITE_REGISTER(DMA2_S7CR, value); /* set bit 17 */
-
 	/* set memory data size to 8-bit */
 	value = READ_REGISTER(DMA2_S7CR, ~(3<<13));
 	WRITE_REGISTER(DMA2_S7CR, value);
@@ -145,14 +104,10 @@ void setup_dma() {
 	/* set peripheral data size to 8-bit */
 	value = READ_REGISTER(DMA2_S7CR, ~(3<<11));
 	WRITE_REGISTER(DMA2_S7CR, value);
-
-	/* Enable interrupt transmit complete */
-	value = READ_REGISTER(DMA2_S7CR, ~(1<<4));
-	value |= 1<<4;
-	WRITE_REGISTER(DMA2_S7CR, value);
-
-	/* clear events and flags */
-	/* clear flag */
+}
+void clear_events_flags() {
+	unsigned int value = 0;
+	/* clear events */
 	value = READ_REGISTER(DMA2_HIFCR, ~(1<<27));
 	value |= 1<<27;
 	WRITE_REGISTER(DMA2_HIFCR, value);
@@ -177,11 +132,60 @@ void setup_dma() {
 	value = READ_REGISTER(DMA2_HIFCR, ~(1<<25));
 	value &= 1<<25;
 	WRITE_REGISTER(DMA2_HIFCR, value);
+}
+/* Setup DMA */
+void setup_dma_uart() {
+	unsigned int value = 0;
 
-	/* Enable DMA */
+	/* Write the USART_DR address in the DMA control register as DESTINATION */
+
+	/* disable stream7 */
+	value = READ_REGISTER(DMA2_S7CR, ~1);
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* channel selected is 4 */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<25));
+	WRITE_REGISTER(DMA2_S7CR, value);
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<26));
+	WRITE_REGISTER(DMA2_S7CR, value);
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<27));
+	value |= 1<<27;
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* set transfer mode is memory to peripheral: 01 */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<6));
+	value |= 1<<6;
+	WRITE_REGISTER(DMA2_S7CR, value);
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<7));
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* setup DR as destination */
+	WRITE_REGISTER(DMA2_S7PAR, UART_DR);
+
+	/* Configure Priority level to high(10) */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<16));
+	WRITE_REGISTER(DMA2_S7CR, value); /* clear bit 16 */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<17));
+	value |= 1<<17;
+	WRITE_REGISTER(DMA2_S7CR, value); /* set bit 17 */
+
+	/* set memory size and peripheral size */
+	set_memsize_persize();
+
+
+	/* Enable interrupt transmit complete */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<4));
+	value |= 1<<4;
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* clear events and flags */
+	clear_events_flags();
+
+	/* Enable DMA
 	value = READ_REGISTER(DMA2_S7CR, ~1);
 	value |= 1;
 	WRITE_REGISTER(DMA2_S7CR, value);
+	*/
 }
 
 
@@ -192,14 +196,60 @@ void start_dma_stream() {
 	value |= 1;
 	WRITE_REGISTER(DMA2_S7CR, value);
 }
-
 void stop_dma_stream() {
 	unsigned int value = 0;
 
 	value = READ_REGISTER(DMA2_S7CR, ~1);
-	value |= 1;
+	value |= 0;
 	WRITE_REGISTER(DMA2_S7CR, value);
 }
+
+void trans_1_byte(unsigned char data) {
+	unsigned int value = 0;
+	/* disable stream7 */
+	stop_dma_stream();
+
+	/* FOR ARR- BYTE setup variable as source */
+	WRITE_REGISTER(DMA2_S7M0AR, (unsigned int)&data);
+
+	/* disable increment */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<10));
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* transmit only 1 byte */
+	WRITE_REGISTER(DMA2_S7NDTR, 1);
+
+	clear_events_flags();
+
+	/* Enable stream7 */
+	start_dma_stream();
+}
+
+void trans_arr(unsigned char *adrr_data, unsigned int len_data) {
+	/* strlen */
+	unsigned int value = 0;
+	/* disable stream7 */
+	stop_dma_stream();
+
+	/* FOR ARR- BYTE setup variable as source */
+	WRITE_REGISTER(DMA2_S7M0AR, (unsigned int)adrr_data);
+
+	/* memory increment */
+	value = READ_REGISTER(DMA2_S7CR, ~(1<<10));
+	value |= 1 <<10;
+	WRITE_REGISTER(DMA2_S7CR, value);
+
+	/* FOR_ARR, BYTE setup bytes size */
+	WRITE_REGISTER(DMA2_S7NDTR, len_data);
+
+	clear_events_flags();
+
+	/* Enable stream7 */
+	start_dma_stream();
+}
+
+
+
 void set_up_uart1() {
 	unsigned int value = 0;
 	/* setup baud rate <=> 115200 */
@@ -238,8 +288,6 @@ void set_up_uart1() {
 }
 
 
-
-
 void DMA2_Stream7_IRQHandler(void) {
 	/* code here */
 	GPIO_WriteBit(GPIOA, GPIO_Pin_7, ON_LED);
@@ -268,7 +316,6 @@ char send_byte_uart(unsigned int data) {
 
 	return value;
 }
-
 /* Handle Receive */
 void receive_data() {
 	unsigned int value = 0;
@@ -287,7 +334,6 @@ void receive_data() {
 
 	} while (value == 1);
 }
-
 void send_data_str_uart1(unsigned char data[], unsigned int size) {
 	unsigned int value = 0;
 	for(int i = 0; i < size; i ++) {
@@ -299,7 +345,6 @@ void send_data_str_uart1(unsigned char data[], unsigned int size) {
 		WRITE_REGISTER(UART_DR, data[i]);
 	}
 }
-
 void send_data_str_uart2(char *data) {
 	unsigned int len = strlen(data);
 
@@ -308,19 +353,13 @@ void send_data_str_uart2(char *data) {
 	}
 }
 
-void send_byte_dma(unsigned char data) {
-	stop_dma_stream();
-	gs_send_data = data;
-
-	setup_dma();
-}
-void send_data_using_dma() {
-
-}
 int main(void)
 {
 	memset(data_arr, 0, 255);
-
+	data_arr[0] ='A';
+	data_arr[1] = 'B';
+	data_arr[2] = 'E';
+	data_arr[3] = 'G';
 
 	/* Default frequency */
 	RCC_DeInit();
@@ -352,14 +391,16 @@ int main(void)
 	WRITE_REGISTER(UART_SR, value1);
 
 	/* step 2*/
-	setup_dma();
-//	DMA_MemoryTargetConfig()
-//	DMA_MemoryTargetConfig()
-//	DMA
+	setup_dma_uart();
+
+	trans_1_byte('T');
+	trans_1_byte('.');
+	unsigned int lendata = strlen(data_arr);
+	trans_arr(&data_arr[0], lendata);
 	while (1) {
-		send_byte_dma('Y');
 	}
 }
+
 
 
 
