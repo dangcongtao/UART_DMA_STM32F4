@@ -206,6 +206,10 @@ void stop_dma_stream() {
 
 void trans_1_byte(unsigned char data) {
 	unsigned int value = 0;
+	do {
+		/* */
+		value = READ_REGISTER(UART_SR, 1<<6);
+	} while (value ==0);
 	/* disable stream7 */
 	stop_dma_stream();
 
@@ -299,66 +303,12 @@ void DMA2_Stream7_IRQHandler(void) {
 
 
 
-
-
-
-
-
-char send_byte_uart(unsigned int data) {
-	unsigned int value = 0;
-	value = READ_REGISTER(UART_SR, (1<<7));
-	/* TX is empty */
-	if (value != 0) {
-		WRITE_REGISTER(UART_DR, data);
-	}
-
-	while(USART_GetFlagStatus(USART1, USART_FLAG_TXE) != SET);
-
-	return value;
-}
-/* Handle Receive */
-void receive_data() {
-	unsigned int value = 0;
-	uint16_t temp = 0;
-	do {
-		value = READ_REGISTER(UART_SR, (1<<5));
-		value = value >> 5;
-		if (value == 1) {
-			temp = READ_REGISTER(UART_DR, 0x1FF);
-			send_byte_uart(temp);
-			GPIO_WriteBit(GPIOA, GPIO_Pin_7, ON_LED);
-			oldtime_led7 = ms_now;
-		} else if (ms_now - oldtime_led7 > DELAY_TIME_MS) {
-			GPIO_WriteBit(GPIOA, GPIO_Pin_7, OFF_LED);
-		}
-
-	} while (value == 1);
-}
-void send_data_str_uart1(unsigned char data[], unsigned int size) {
-	unsigned int value = 0;
-	for(int i = 0; i < size; i ++) {
-		while (value != 1) {
-			value = READ_REGISTER(UART_SR, (1<<7));
-			value = value >> 7;
-		}
-		value = 0;
-		WRITE_REGISTER(UART_DR, data[i]);
-	}
-}
-void send_data_str_uart2(char *data) {
-	unsigned int len = strlen(data);
-
-	for(int i = 0; i < len; i ++) {
-		send_byte_uart(data[i]);
-	}
-}
-
 int main(void)
 {
 	memset(data_arr, 0, 255);
 	data_arr[0] ='A';
 	data_arr[1] = 'B';
-	data_arr[2] = 'E';
+	data_arr[2] = 'F';
 	data_arr[3] = 'G';
 
 	/* Default frequency */
@@ -395,6 +345,7 @@ int main(void)
 
 	trans_1_byte('T');
 	trans_1_byte('.');
+	trans_1_byte(',');
 	unsigned int lendata = strlen(data_arr);
 	trans_arr(&data_arr[0], lendata);
 	while (1) {
